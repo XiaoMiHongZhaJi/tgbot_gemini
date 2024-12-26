@@ -72,6 +72,10 @@ async def send_gemini_response(update: Update, context: CallbackContext, user_qu
     chat_id = update.effective_chat.id
     # 发送文本
     if response.text:
+        if response.finish_reason == "SAFETY":
+            await context.bot.send_message(chat_id=chat_id, text="由于安全原因，无法生成回复，请尝试修改提问或更换问题",
+                                           reply_to_message_id=update.message.message_id)
+            return
         try:
             formatted_text = telegram_markdown(response.text)
             sent_message = await context.bot.send_message(chat_id=chat_id, text=formatted_text,
