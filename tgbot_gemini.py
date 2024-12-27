@@ -4,6 +4,7 @@ from telegram import Update, InputMediaPhoto
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
 import re
 from io import BytesIO
+from md2tgmd import escape
 
 # API 密钥和 Bot Token
 GOOGLE_API_KEY = "YOUR GOOGLE_API_KEY"
@@ -18,11 +19,15 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 
 # Markdown 转换
+# 已弃用，改用现成的 md2tgmd
 def telegram_markdown(text):
-    # 粗体
-    text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
     # 斜体
-    text = re.sub(r'\*(.*?)\*', r'_\1_', text)
+    text = re.sub(r'\*(\S+)\*', r'_\1_', text)
+    # 粗体
+    text = re.sub(r'_\*(\S+)\*_', r'*\1*', text)
+    text = re.sub(r'\*\*(\S+)\*\*', r'*\1*', text)
+    text = text.replace('* ', "• ")
+    text = text.replace(' • ', ' \\* ')
     # . - ( ) # > <
     text = re.sub(r'([!@#$%^&()+\-=\[\]{};\':"\\|,.<>?~])', r'\\\1', text)
     return text
@@ -84,7 +89,7 @@ async def send_gemini_response(update: Update, context: CallbackContext, user_qu
     if response_text:
         logging.info(f"received response text：{response_text}")
         try:
-            formatted_text = telegram_markdown(response_text)
+            formatted_text = escape(response_text)
             sent_message = await context.bot.send_message(chat_id=chat_id, text=formatted_text,
                                                           parse_mode="MarkdownV2",
                                                           reply_to_message_id=update.message.message_id)
