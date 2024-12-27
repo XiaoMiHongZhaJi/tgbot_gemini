@@ -67,25 +67,31 @@ async def send_gemini_response(update: Update, context: CallbackContext, user_qu
         logging.info(f"reply from: {update.message.reply_to_message.text}")
 
     chat = context.chat_data['chat_history']
-    response = chat.send_message(user_question)
-
     chat_id = update.effective_chat.id
-    # 发送文本
-    if response.text:
-        if response.finish_reason == "SAFETY":
+    try:
+        response = chat.send_message(user_question)
+    except Exception as e:
+        logging.error(f"Gemini API error: {e}")
+        if "SAFETY" in str(e) or "content_filter" in str(e):
             await context.bot.send_message(chat_id=chat_id, text="由于安全原因，无法生成回复，请尝试修改提问或更换问题",
                                            reply_to_message_id=update.message.message_id)
-            return
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="生成回复时发生错误, 请再试一次看看",
+                                           reply_to_message_id=update.message.message_id)
+        return
+    # 发送文本
+    response_text = response.text
+    if response_text:
+        logging.info(f"received response text：{response_text}")
         try:
-            formatted_text = telegram_markdown(response.text)
+            formatted_text = telegram_markdown(response_text)
             sent_message = await context.bot.send_message(chat_id=chat_id, text=formatted_text,
                                                           parse_mode="MarkdownV2",
                                                           reply_to_message_id=update.message.message_id)
             context.chat_data['last_message_id'] = sent_message.message_id
             logging.info(f"reply md converted text：{formatted_text}")
         except Exception as e:
-            response_text = response.text
-            logging.error(f"md conversion error, change to original text: {response_text}\nerror info：{e}")
+            logging.error(f"md conversion error, change to original text \n error info：{e}")
             sent_message = await context.bot.send_message(chat_id=chat_id, text=response_text,
                                                           reply_to_message_id=update.message.message_id)
             context.chat_data['last_message_id'] = sent_message.message_id
